@@ -215,6 +215,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
 
                           ),
+                       //  SizedBox(height: 10,),
+                       const  SizedBox(
+                           child: Row(
+                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                             children: [
+                               Text("IP: 192.168.1.112"),
+                               Text("VERSION : 1.0.7")
+                             ],
+                           ),
+                         )
                         ],
                       ),
                     ),

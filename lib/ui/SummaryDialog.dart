@@ -150,6 +150,7 @@ class SummaryDialog{
                               fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ),
+
                     ],
                   ),
                 ),

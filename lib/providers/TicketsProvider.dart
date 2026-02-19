@@ -1,13 +1,7 @@
-
 import 'dart:async';
-import 'dart:ffi';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import '../data_models/get_categories/ticket_category_model.dart';
 import '../data_models/login_datamodel/user_model.dart';
@@ -22,30 +16,28 @@ import '../utils/SharedPrefHelper.dart';
 import '../utils/ToastUtils.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
-
 class TicketsProvider with ChangeNotifier {
   final DioService _dioService = DioService();
-
   bool _isLoading = false;
   bool get isLoading => _isLoading;
-   TicketCategoriesResponse? _ticketCategoriesResponse;
-   TicketCategoriesResponse? get ticketCategoriesResponse  => _ticketCategoriesResponse;
+  TicketCategoriesResponse? _ticketCategoriesResponse;
+  TicketCategoriesResponse? get ticketCategoriesResponse  => _ticketCategoriesResponse;
   final Map<int, int> _categoryPersons = {};
-  final Map<int, List<int>> _categoryTimestamps = {}; // ✅ Correct
+  final Map<int, List<int>> _categoryTimestamps = {};
 
 
 
   DatabaseHelper? databaseHelper;
   User? _user;
-    User? get user => _user;
+  User? get user => _user;
 
   int _visitCount = 0;
   int get visitCount => _visitCount;
 
 
   Future<int> getPendingCounts() async {
-    final pending = await _fetchPendingVisitData(); // this is List<VisitingDataList>
-    return pending.length;                          // return how many
+    final pending = await _fetchPendingVisitData();
+    return pending.length;
   }
 
 
@@ -54,91 +46,83 @@ class TicketsProvider with ChangeNotifier {
   List<VisitingDataList>? get visitingDataList => _visitingDataList;
 
   List<VisitingDataList>?  _visitingSummaryDataList;
-    List<VisitingDataList>? get visitingSummaryDataList => _visitingSummaryDataList;
+  List<VisitingDataList>? get visitingSummaryDataList => _visitingSummaryDataList;
 
   TicketsProvider({required DatabaseHelper databaseHelper}) : databaseHelper = databaseHelper {
-     loadUser();
-     databaseHelper.getVisitingData();
-     databaseHelper.getVisitingData().then((data) {
-       print("Database Data: $data");
-     });
-     startBackgroundTask();
-     applyFilter();
-     databaseHelper.visitCountNotifier.addListener(() {
-           _visitCount = databaseHelper.visitCountNotifier.value;
-           notifyListeners();
-         });
+    loadUser();
+    databaseHelper.getVisitingData();
+    databaseHelper.getVisitingData().then((data) {
+      print("Database Data: $data");
+    });
+    startBackgroundTask();
+    applyFilter();
+    databaseHelper.visitCountNotifier.addListener(() {
+      _visitCount = databaseHelper.visitCountNotifier.value;
+      notifyListeners();
+    });
 
 
-   }
+  }
 
   Future<void> fetchVisitCount() async {
-      final data = await DatabaseHelper.instance.getPendingData();
-      print("visit count in provider ${data.length}");
-      _visitCount = data.length;
+    final data = await DatabaseHelper.instance.getPendingData();
+    print("visit count in provider ${data.length}");
+    _visitCount = data.length;
+    notifyListeners();
+  }
+
+  Future<void> loadUser() async {
+    _user = SharedPrefHelper.getUser();
+    print("User loaded in provider: $_user");
+    print("User ID: ${_user?.userId}");
+    print("User Name: ${_user?.firstName} ${_user?.lastName}");
+    print("Parking Lot: ${_user?.parkingLotName}");
+
+    if (_user != null) {
       notifyListeners();
+    } else {
+      print("⚠️ No user found in SharedPreferences");
     }
+    //databaseHelper?.resetDatabase();
+    var macId = (await getWindowsId())!;
+    windowsId =macId!.replaceAll('{', '').replaceAll('}', '');
+    print("Windows id $windowsId");
+  }
 
-    Future<void> loadUser() async {
-      _user = SharedPrefHelper.getUser();
-      print("User loaded in provider: $_user");
-
-      if (_user != null) {
-        notifyListeners();
-      } else {
-        print("⚠️ No user found in SharedPreferences");
-      }
-      //databaseHelper?.resetDatabase();
-       var macId = (await getWindowsId())!;
-      windowsId =macId!.replaceAll('{', '').replaceAll('}', '');
-      print("Windows id $windowsId");
-    }
-
-    Map<int, int> get categoryPersons => _categoryPersons;
-
-
-
-    // Get total persons count
-    int get totalPersons => _categoryPersons.values.fold(0, (sum, count) => sum + count);
-
+  Map<int, int> get categoryPersons => _categoryPersons;
+  int get totalPersons => _categoryPersons.values.fold(0, (sum, count) => sum + count);
   void setCategoriesFromCache(List<TicketCategory> cachedCategories) {
     fetchVisitCount();
     _ticketCategoriesResponse = TicketCategoriesResponse(catagories: cachedCategories);
     notifyListeners();
   }
-
-    // Get total cost
-    double get totalCost {
-      if (_ticketCategoriesResponse == null) return 0.0;
-      return _ticketCategoriesResponse!.catagories.fold(0, (sum, category) {
-        int count = _categoryPersons[category.id] ?? 0;
-        return sum + (count * category.routineCharges!);
-      });
-    }
-
-  // Get list of categories with ID, name, routine charges, and total persons per category
+  double get totalCost {
+    if (_ticketCategoriesResponse == null) return 0.0;
+    return _ticketCategoriesResponse!.catagories.fold(0, (sum, category) {
+      int count = _categoryPersons[category.id] ?? 0;
+      return sum + (count * category.routineCharges!);
+    });
+  }
   List<Map<String, dynamic>> get selectedCategoryDetailsList {
     if (_ticketCategoriesResponse == null) return [];
 
     return _categoryPersons.entries
-        .where((entry) => entry.value > 0) // Only include categories with persons
+        .where((entry) => entry.value > 0)
         .map((entry) {
-          final category = _ticketCategoriesResponse!.catagories.firstWhere(
-            (cat) => cat.id == entry.key, // Provide a valid default instance
-          );
-
-
-          return {
-            "categoryId": category.id,
-            "categoryName": category.name, // Assuming 'name' field exists
-            "routineCharges": category.routineCharges ?? 0.0,
-            "totalPersons": entry.value,
-            "timestamp": _categoryTimestamps[category.id] ?? 0, // Include timestamp
-            // "visitorTypeId" : category.visitorTypeId,
-            // "parkingLotsId" : category.parkingLotsId,
-            "categoryCharges" : entry.value * category.routineCharges!
-          };
-        })
+      final category = _ticketCategoriesResponse!.catagories.firstWhere(
+            (cat) => cat.id == entry.key,
+      );
+      return {
+        "categoryId": category.id,
+        "categoryName": category.name, // Assuming 'name' field exists
+        "routineCharges": category.routineCharges ?? 0.0,
+        "totalPersons": entry.value,
+        "timestamp": _categoryTimestamps[category.id] ?? 0, // Include timestamp
+        // "visitorTypeId" : category.visitorTypeId,
+        // "parkingLotsId" : category.parkingLotsId,
+        "categoryCharges" : entry.value * category.routineCharges!
+      };
+    })
         .toList();
   }
 
@@ -149,27 +133,27 @@ class TicketsProvider with ChangeNotifier {
     return _categoryPersons.entries
         .where((entry) => entry.value > 0) // Only include categories with persons
         .map((entry) {
-          final category = _ticketCategoriesResponse!.catagories.firstWhere(
+      final category = _ticketCategoriesResponse!.catagories.firstWhere(
             (cat) => cat.id == entry.key,
-          );
+      );
 
-          final String fareId = category.visitorTypeId.toString();
-          final int count = entry.value;
-          final String serviceName = category.name.toString();
-          final int routineCharges = category.routineCharges ?? 0;
-          final int amount = count * routineCharges;
-          final Object transactionUniqueIds = _categoryTimestamps[category.id] ?? [];
+      final String fareId = category.visitorTypeId.toString();
+      final int count = entry.value;
+      final String serviceName = category.name.toString();
+      final int routineCharges = category.routineCharges ?? 0;
+      final int amount = count * routineCharges;
+      final Object transactionUniqueIds = _categoryTimestamps[category.id] ?? [];
 
-          return {
-            "serviceName" : serviceName,
-            "visitorTypeId": fareId,
-            "categoryId": category.id,
-            "count": count,
-            "amount": amount,
-            "routine_charges": routineCharges,
-            "transection_unique_ids": transactionUniqueIds
-          };
-        })
+      return {
+        "serviceName" : serviceName,
+        "visitorTypeId": fareId,
+        "categoryId": category.id,
+        "count": count,
+        "amount": amount,
+        "routine_charges": routineCharges,
+        "transection_unique_ids": transactionUniqueIds
+      };
+    })
         .toList();
   }
 
@@ -177,7 +161,7 @@ class TicketsProvider with ChangeNotifier {
   void clearAllData() {
     _categoryPersons.clear();
     _categoryTimestamps.clear();
-    notifyListeners(); // Notify UI to refresh
+    notifyListeners();
   }
   void printSummaryList(BuildContext context){
     SummaryDialog.showBillDialog(context, visitingSummaryDataList!);
@@ -185,29 +169,31 @@ class TicketsProvider with ChangeNotifier {
 
 
   Future<void> addTicketsDataToList() async {
+    await loadUser();
 
     var uId = DateTime.now().millisecondsSinceEpoch.toString();
     _visitingDataList = [
       VisitingDataList(
-        typeWiseData: typeWiseDataMap,
-        paymentId: "1",
-        totalPersons: totalPersons.toString(),
-        totalAmount: totalCost.toString(),
-        gateId: user?.gatesId.toString(),
-        parkingLotId: user?.parkingLotsId.toString(),
-        userId: user?.userId.toString(),
-        date: getTimeDate(),
-        userName: "${user?.firstName} ${user?.lastName}",
-        gateName: user?.name,
-        ticketingPoint: user?.name,
-        transactionUniqueId: uId,
-        userMacId: windowsId,
-        isUploaded: 0,
-        billNo: uId
+          typeWiseData: typeWiseDataMap,
+          paymentId: "1",
+          totalPersons: totalPersons.toString(),
+          totalAmount: totalCost.toString(),
+          gateId: user?.gatesId.toString(),
+          parkingLotId: user?.parkingLotsId.toString(),
+          userId: user?.userId.toString(),
+          date: getTimeDate(),
+          userName: "${user?.firstName} ${user?.lastName}",
+          gateName: user?.name,
+          ticketingPoint: user?.name,
+          transactionUniqueId: uId,
+          userMacId: windowsId,
+          isUploaded: 0,
+          billNo: uId
       ),
     ];
 
     print('user id ${user?.userId.toString()}');
+    print('user name ${user?.firstName} ${user?.lastName}');
     print(visitingDataList);
 
   }
@@ -218,14 +204,13 @@ class TicketsProvider with ChangeNotifier {
     print(_visitingDataList);
   }
 
-  void dataAddToDB(BuildContext context) async {
+  Future<void> dataAddToDB(BuildContext context) async {
     //await databaseHelper?.resetDatabase();
-    addTicketsDataToList();
+   await addTicketsDataToList();
     if (categoryPersons.isNotEmpty) {
 
       if (visitingDataList != null && visitingDataList!.isNotEmpty && await HelperFunction.hasInternetConnection()) {
         updateIsUploaded(1);
-
         _visitingSummaryDataList = visitingDataList;
         print('summary list is $visitingSummaryDataList');
         for (var data in visitingDataList!) {
@@ -251,22 +236,22 @@ class TicketsProvider with ChangeNotifier {
   }
 
   // Increase person count
-    void increasePersonCount(int categoryId) {
+  void increasePersonCount(int categoryId) {
 
-      _categoryPersons[categoryId] = (_categoryPersons[categoryId] ?? 0) + 1;
-      // Add timestamp to list
-       final timestamp = DateTime.now().millisecondsSinceEpoch;
-       _categoryTimestamps.putIfAbsent(categoryId, () => []).add(timestamp);
-      print(categoryPersons);
-      print(totalCost);
-      print(totalPersons);
-      print (selectedCategoryDetailsList);
-      // print (_categoryTimestamps);
-      notifyListeners();
-      //addTicketsDataToList();
-    }
+    _categoryPersons[categoryId] = (_categoryPersons[categoryId] ?? 0) + 1;
+    // Add timestamp to list
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    _categoryTimestamps.putIfAbsent(categoryId, () => []).add(timestamp);
+    print(categoryPersons);
+    print(totalCost);
+    print(totalPersons);
+    print (selectedCategoryDetailsList);
+    // print (_categoryTimestamps);
+    notifyListeners();
+    //addTicketsDataToList();
+  }
 
-    // Decrease person count
+  // Decrease person count
   void decreasePersonCount(int categoryId) {
     if (_categoryPersons.containsKey(categoryId) && _categoryPersons[categoryId]! > 0) {
       _categoryPersons[categoryId] = _categoryPersons[categoryId]! - 1;
@@ -285,11 +270,11 @@ class TicketsProvider with ChangeNotifier {
 
 
   String getTimeDate(){
-      DateTime now = DateTime.now();
-      String formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
-      print(formattedDate); // Example: 2024-03-01 14:30:00
-      return formattedDate;
-    }
+    DateTime now = DateTime.now();
+    String formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
+    print(formattedDate); // Example: 2024-03-01 14:30:00
+    return formattedDate;
+  }
 
   Future<String?> getWindowsId() async {
     final deviceInfo = DeviceInfoPlugin();
@@ -345,10 +330,10 @@ class TicketsProvider with ChangeNotifier {
   }
 
   Future<PostResponseModel?> postVisitingData(BuildContext context, VisitingDataList visitingDataList ) async {
-     _isLoading = true;
+    _isLoading = true;
     notifyListeners();
 
-     var typeWiseData = typeData(visitingDataList);
+    var typeWiseData = typeData(visitingDataList);
     try {
       final fullUrl = "${_dioService.baseUrl}${Constants.postVisitingData}";
       print("🔄 API Request Sent: '$fullUrl'");
@@ -358,8 +343,8 @@ class TicketsProvider with ChangeNotifier {
       Response response = await _dioService.postRequest(
         Constants.postVisitingData,
         {
-           'typeWiseData': typeWiseData,
-           'paymentId': visitingDataList.paymentId,
+          'typeWiseData': typeWiseData,
+          'paymentId': visitingDataList.paymentId,
           'totalPersons': visitingDataList.totalPersons, // Modify as needed
           'totalAmount': visitingDataList.totalAmount,
           'gate_id': visitingDataList.gateId,
@@ -377,18 +362,18 @@ class TicketsProvider with ChangeNotifier {
 
 
       print({
-                 'typeWiseData': typeWiseData,
-                 'paymentId': visitingDataList.paymentId,
-                'totalPersons': visitingDataList.totalPersons, // Modify as needed
-                'totalAmount': visitingDataList.totalAmount,
-                'gate_id': visitingDataList.gateId,
-                'parking_lot_id': visitingDataList.parkingLotId,
-                'user_id': visitingDataList.userId,
-                'date': visitingDataList.date,
-                'transection_unique_id': visitingDataList.transactionUniqueId,
-                'user_mac_id': visitingDataList.userMacId,
-                'bill_no' : visitingDataList.billNo
-              },);
+        'typeWiseData': typeWiseData,
+        'paymentId': visitingDataList.paymentId,
+        'totalPersons': visitingDataList.totalPersons, // Modify as needed
+        'totalAmount': visitingDataList.totalAmount,
+        'gate_id': visitingDataList.gateId,
+        'parking_lot_id': visitingDataList.parkingLotId,
+        'user_id': visitingDataList.userId,
+        'date': visitingDataList.date,
+        'transection_unique_id': visitingDataList.transactionUniqueId,
+        'user_mac_id': visitingDataList.userMacId,
+        'bill_no' : visitingDataList.billNo
+      },);
 
       print("📥 Response Data: ${response.data}");
 
@@ -401,20 +386,20 @@ class TicketsProvider with ChangeNotifier {
 
         updateIsUploaded(1);
         print("before in condition!");
-               // if(categoryPersons.isNotEmpty){
-               //        if (visitingDataList != null) {
-               //
-               //          await databaseHelper?.insertVisitingData(visitingDataList); // Pass object directly
-               //
-               //
-               //              print("Data saved successfully in SQLite!");
-               //              clearAllData();
-               //            } else {
-               //              print("No data available to save.");
-               //            }
-                    // } else {
-                    //   ToastUtils.showErrorToast(context, "Please select any Service");
-                    // }
+        // if(categoryPersons.isNotEmpty){
+        //        if (visitingDataList != null) {
+        //
+        //          await databaseHelper?.insertVisitingData(visitingDataList); // Pass object directly
+        //
+        //
+        //              print("Data saved successfully in SQLite!");
+        //              clearAllData();
+        //            } else {
+        //              print("No data available to save.");
+        //            }
+        // } else {
+        //   ToastUtils.showErrorToast(context, "Please select any Service");
+        // }
         notifyListeners();
 
         return postResponse; //  Return parsed response
@@ -436,63 +421,62 @@ class TicketsProvider with ChangeNotifier {
       ToastUtils.showErrorToast(context, "Something went wrong. Try again later.");
     } finally {
       _isLoading = false;
-      notifyListeners(); // Notify UI to hide loader
+      notifyListeners();
     }
-
     return null;
   }
   DateTime? _fromDate;
-    DateTime? _toDate;
-    bool _showPending = false;
-    List<VisitingDataList> _filteredVisitingData = [];
+  DateTime? _toDate;
+  bool _showPending = false;
+  List<VisitingDataList> _filteredVisitingData = [];
 
-    DateTime? get fromDate => _fromDate;
-    DateTime? get toDate => _toDate;
-    bool get showPending => _showPending;
-    List<VisitingDataList> get filteredVisitingData => _filteredVisitingData;
+  DateTime? get fromDate => _fromDate;
+  DateTime? get toDate => _toDate;
+  bool get showPending => _showPending;
+  List<VisitingDataList> get filteredVisitingData => _filteredVisitingData;
 
-    Future<void> setFromDate(DateTime? date) async {
-      _fromDate = date;
-      notifyListeners();
+  Future<void> setFromDate(DateTime? date) async {
+    _fromDate = date;
+    notifyListeners();
+  }
+
+  Future<void> setToDate(DateTime? date) async {
+    _toDate = date;
+    notifyListeners();
+  }
+
+  Future<void> setShowPending(bool value) async {
+    _showPending = value;
+    notifyListeners();
+  }
+
+  Future<void> applyFilter() async {
+    if (_showPending) {
+      _filteredVisitingData = await _fetchPendingVisitData(from: _fromDate, to: _toDate);
+    } else {
+      _filteredVisitingData = await _fetchVisitData(from: _fromDate, to: _toDate);
+    }
+    notifyListeners();
+  }
+
+  Future<List<VisitingDataList>> _fetchVisitData({DateTime? from, DateTime? to}) async {
+    List<VisitingDataList> allData = await DatabaseHelper.instance.getVisitingData();
+
+    if (from != null && to != null) {
+      return allData.where((ticket) {
+        DateTime ticketDate = DateTime.parse(ticket.date!).toLocal();
+        DateTime ticketOnlyDate = DateTime(ticketDate.year, ticketDate.month, ticketDate.day);
+        DateTime fromOnlyDate = DateTime(from.year, from.month, from.day);
+        DateTime toOnlyDate = DateTime(to.year, to.month, to.day);
+
+        return ticketOnlyDate.isAtSameMomentAs(fromOnlyDate) ||
+            ticketOnlyDate.isAtSameMomentAs(toOnlyDate) ||
+            (ticketOnlyDate.isAfter(fromOnlyDate) && ticketOnlyDate.isBefore(toOnlyDate));
+      }).toList();
     }
 
-    Future<void> setToDate(DateTime? date) async {
-      _toDate = date;
-      notifyListeners();
-    }
-
-    Future<void> setShowPending(bool value) async {
-      _showPending = value;
-      notifyListeners();
-    }
-
-    Future<void> applyFilter() async {
-      if (_showPending) {
-        _filteredVisitingData = await _fetchPendingVisitData(from: _fromDate, to: _toDate);
-      } else {
-        _filteredVisitingData = await _fetchVisitData(from: _fromDate, to: _toDate);
-      }
-      notifyListeners();
-    }
-
-    Future<List<VisitingDataList>> _fetchVisitData({DateTime? from, DateTime? to}) async {
-      List<VisitingDataList> allData = await DatabaseHelper.instance.getVisitingData();
-
-      if (from != null && to != null) {
-        return allData.where((ticket) {
-          DateTime ticketDate = DateTime.parse(ticket.date!).toLocal();
-          DateTime ticketOnlyDate = DateTime(ticketDate.year, ticketDate.month, ticketDate.day);
-          DateTime fromOnlyDate = DateTime(from.year, from.month, from.day);
-          DateTime toOnlyDate = DateTime(to.year, to.month, to.day);
-
-          return ticketOnlyDate.isAtSameMomentAs(fromOnlyDate) ||
-                 ticketOnlyDate.isAtSameMomentAs(toOnlyDate) ||
-                 (ticketOnlyDate.isAfter(fromOnlyDate) && ticketOnlyDate.isBefore(toOnlyDate));
-        }).toList();
-      }
-
-      return allData;
-    }
+    return allData;
+  }
 
 
   Timer? _timer;
@@ -518,104 +502,96 @@ class TicketsProvider with ChangeNotifier {
   }
 
 
-    Future<List<VisitingDataList>> _fetchPendingVisitData({DateTime? from, DateTime? to}) async {
-      List<VisitingDataList> allData = await DatabaseHelper.instance.getVisitingData();
-      return allData.where((ticket) => ticket.isUploaded == 0).toList();
-    }
+  Future<List<VisitingDataList>> _fetchPendingVisitData({DateTime? from, DateTime? to}) async {
+    List<VisitingDataList> allData = await DatabaseHelper.instance.getVisitingData();
+    return allData.where((ticket) => ticket.isUploaded == 0).toList();
+  }
 
 
 
   Future<PostResponseModel?> postVisitingDataFromDB(VisitingDataList visitingDataList ) async {
-      _isLoading = true;
-     notifyListeners(); // Notify UI to show loader
+    _isLoading = true;
+    notifyListeners(); // Notify UI to show loader
 
 
-      var typeWiseData = typeData(visitingDataList);
-     try {
-       final fullUrl = "${_dioService.baseUrl}${Constants.postVisitingData}";
-       print("🔄 API Request Sent: '$fullUrl'");
-       print("🔄 API Request Sent: '$fullUrl'");
+    var typeWiseData = typeData(visitingDataList);
+    try {
+      final fullUrl = "${_dioService.baseUrl}${Constants.postVisitingData}";
+      print("🔄 API Request Sent: '$fullUrl'");
+      print("🔄 API Request Sent: '$fullUrl'");
 
 
-       Response response = await _dioService.postRequest(
-         Constants.postVisitingData,
-         {
-            'typeWiseData': typeWiseData,
-            'paymentId': visitingDataList.paymentId,
-           'totalPersons': visitingDataList.totalPersons,
-           'totalAmount': visitingDataList.totalAmount,
-           'gate_id': visitingDataList.gateId,
-           'parking_lot_id': visitingDataList.parkingLotId,
-           'user_id': visitingDataList.userId,
-           'date': visitingDataList.date,
-           'transection_unique_id': visitingDataList.transactionUniqueId,
-           'user_mac_id': visitingDataList.userMacId,
-           'bill_no' : visitingDataList.billNo
-         },
-         options: Options (
-           validateStatus: (status) => true, // ✅ Allow all status codes
-         ),
-       );
+      Response response = await _dioService.postRequest(
+        Constants.postVisitingData,
+        {
+          'typeWiseData': typeWiseData,
+          'paymentId': visitingDataList.paymentId,
+          'totalPersons': visitingDataList.totalPersons,
+          'totalAmount': visitingDataList.totalAmount,
+          'gate_id': visitingDataList.gateId,
+          'parking_lot_id': visitingDataList.parkingLotId,
+          'user_id': visitingDataList.userId,
+          'date': visitingDataList.date,
+          'transection_unique_id': visitingDataList.transactionUniqueId,
+          'user_mac_id': visitingDataList.userMacId,
+          'bill_no' : visitingDataList.billNo
+        },
+        options: Options (
+          validateStatus: (status) => true,
+        ),
+      );
 
 
-       print({ "post data body"
-                  'typeWiseData': typeWiseData,
-                  'paymentId': visitingDataList.paymentId,
-                 'totalPersons': visitingDataList.totalPersons, // Modify as needed
-                 'totalAmount': visitingDataList.totalAmount,
-                 'gate_id': visitingDataList.gateId,
-                 'parking_lot_id': visitingDataList.parkingLotId,
-                 'user_id': visitingDataList.userId,
-                 'date': visitingDataList.date,
-                 'transection_unique_id': visitingDataList.transactionUniqueId,
-                 'user_mac_id': visitingDataList.userMacId,
-               },);
+      print({ "post data body"
+          'typeWiseData': typeWiseData,
+        'paymentId': visitingDataList.paymentId,
+        'totalPersons': visitingDataList.totalPersons,
+        'totalAmount': visitingDataList.totalAmount,
+        'gate_id': visitingDataList.gateId,
+        'parking_lot_id': visitingDataList.parkingLotId,
+        'user_id': visitingDataList.userId,
+        'date': visitingDataList.date,
+        'transection_unique_id': visitingDataList.transactionUniqueId,
+        'user_mac_id': visitingDataList.userMacId,
+      },);
 
-       print("📥 Response Data: ${response.data}");
+      print("Response Data: ${response.data}");
 
 
-       if (response.statusCode == 200) {
-         print("✅ Success! Status Code: ${response.statusCode}");
+      if (response.statusCode == 200) {
+        print(" Success! Status Code: ${response.statusCode}");
+        final postResponse = PostResponseModel.fromJson(response.data);
+        print("database id ${visitingDataList.id!}");
+        await databaseHelper?.updateIsUploaded(visitingDataList.transactionUniqueId!);
+        updateRecord();
+        notifyListeners();
+        return postResponse;
+      } else {
+        print("Failed! Status Code: ${response.statusCode}");
+        final errorResponse = PostResponseModel.fromJson(response.data);
 
-         // Parse the response using PostResponseModel
-         final postResponse = PostResponseModel.fromJson(response.data);
-         //ToastUtils.showSuccessToast(context, postResponse.success!);
+        // Show error toast if error message exists
+        // ToastUtils.showErrorToast(
+        //   context,
+        //   errorResponse.error ?? "Unauthorized access. Please check your credentials.",
+        // );
+      }
+    } catch (e) {
+      print(" Error during post: $e");
+      //ToastUtils.showErrorToast(context, "Something went wrong. Try again later.");
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
 
-         print("database id ${visitingDataList.id!}");
-         await databaseHelper?.updateIsUploaded(visitingDataList.transactionUniqueId!);
-         updateRecord();
-         notifyListeners();
-
-         return postResponse; // ✅ Return parsed response
-       } else {
-         print("⚠️ Failed! Status Code: ${response.statusCode}");
-
-         // Parse error response
-         final errorResponse = PostResponseModel.fromJson(response.data);
-
-         // Show error toast if error message exists
-         // ToastUtils.showErrorToast(
-         //   context,
-         //   errorResponse.error ?? "Unauthorized access. Please check your credentials.",
-         // );
-       }
-     } catch (e) {
-       print("❌ Error during post: $e");
-       //ToastUtils.showErrorToast(context, "Something went wrong. Try again later.");
-     } finally {
-       _isLoading = false;
-       notifyListeners(); // Notify UI to hide loader
-     }
-
-     return null;
-   }
+    return null;
+  }
 
   Future<void> updateRecord() async {
-    // ✅ Fetch updated data from the database
     List<VisitingDataList> updatedList = await DatabaseHelper.instance.getVisitingData();
 
     _visitingDataList = updatedList;
-    notifyListeners(); // ✅ Notify UI to update filtered list
+    notifyListeners();
   }
 
 
@@ -623,34 +599,34 @@ class TicketsProvider with ChangeNotifier {
 
   Future<TicketCategoriesResponse?> getCategories(BuildContext context) async {
     _isLoading = true;
-    notifyListeners(); // Notify UI to show loader
+    notifyListeners();
     fetchVisitCount();
 
     try {
       final fullUrl = "${_dioService.baseUrl}${Constants.getCategories}";
       final user = await SharedPrefHelper.getUser();
-           if (user == null) {
-             print("⚠️ User not found in SharedPreferences!");
-             ToastUtils.showErrorToast(context, "User not found. Please login.");
-           }
+      if (user == null) {
+        print("User not found in SharedPreferences!");
+        ToastUtils.showErrorToast(context, "User not found. Please login.");
+      }
 
-           String? id = user?.parkingLotsId.toString();
-      print("🔄 API Request Sent: '$fullUrl'");
-      print("📤 Request Data: {'id': $id}");
+      String? id = user?.parkingLotsId.toString();
+      print(" API Request Sent: '$fullUrl'");
+      print("Request Data: {'id': $id}");
 
       Response response = await _dioService.getRequest(Constants.getCategories, {
         'id': "2",
 
       },
         options: Options(
-               validateStatus: (status) => true, // ✅ Allow all status codes
-             ),
+          validateStatus: (status) => true,
+        ),
       );
 
       if (response.statusCode == 200) {
-        print("✅ Success! Status Code: ${response.statusCode}");
-        print("✅ Success! Status Code: ${response.statusMessage}");
-        print("📥 Response Data: ${response.data}");
+        print(" Success! Status Code: ${response.statusCode}");
+        print(" Success! Status Code: ${response.statusMessage}");
+        print(" Response Data: ${response.data}");
 
         TicketCategoriesResponse ticketCategoriesResponse  = TicketCategoriesResponse.fromJson(response.data);
         ToastUtils.showSuccessToast(context, "🎉 Data fetched!");
@@ -666,16 +642,16 @@ class TicketsProvider with ChangeNotifier {
 
         return ticketCategoriesResponse;
       } else {
-        print("⚠️ Failed! Status Code: ${response.statusCode}");
-        print("⚠️ Failed! Status Code: ${response.statusMessage}");
-        print("📥 Response Data: ${response.data}");
+        print("Failed! Status Code: ${response.statusCode}");
+        print("Failed! Status Code: ${response.statusMessage}");
+        print("Response Data: ${response.data}");
       }
     } catch (e) {
-      print("❌ Error adding post: $e");
+      print("Error adding post: $e");
 
     } finally {
       _isLoading = false;
-      notifyListeners(); // Notify UI to hide loader
+      notifyListeners();
     }
 
     return null;

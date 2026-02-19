@@ -1,71 +1,49 @@
-#define MyAppName "Lahore Fort"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "BLS"
-#define MyAppURL "https://www.bls.com.pk"
-#define MyAppExeName "lahorefort.exe"
-#define MyAppIcon "lahore_fort_logo.ico"
+#define MyAppName      "Lahore Fort"
+#define MyAppVersion   "1.0.7"
+#define MyAppExeName   "lahorefort.exe"
+#define SourcePath     "build\windows\x64\runner\Release"
 
 [Setup]
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppVerName={#MyAppName} {#MyAppVersion}
-AppPublisher={#MyAppPublisher}
-AppPublisherURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
-OutputDir=output
-OutputBaseFilename=LahoreFort_Installer_v{#MyAppVersion}
-SetupIconFile={#MyAppIcon}
+OutputDir=installer_output
+OutputBaseFilename=LahoreFort_Setup_v{#MyAppVersion}
+SetupIconFile=lahore_fort_logo.ico
 Compression=lzma
-SolidCompression=yes
-PrivilegesRequired=admin
-WizardStyle=modern
+SolidCompression=no
+ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
-; CRITICAL FIXES BELOW
-        DisableWelcomePage=no
-DisableDirPage=no
-DisableProgramGroupPage=no
-CloseApplications=yes
-CloseApplicationsFilter=*.exe,*.dll,*.chm
-        RestartApplications=no
-
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-
-[Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut"; Flags: unchecked
-        Name: "startmenuicon"; Description: "Create a &Start Menu shortcut"; Flags: checkedonce
+PrivilegesRequiredOverridesAllowed=dialog
+WizardStyle=modern
+UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Files]
-; MAIN FIX: Copy EVERYTHING from Release folder
-        Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Flutter engine data
-        Source: "build\windows\x64\runner\Release\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Your assets
-Source: "assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs
-; VC++ Redist
-        Source: "VC_redist.x64.exe"; DestDir: "{app}"; Flags: ignoreversion
-; Icon for shortcuts
-        Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
+; Main application files
+        Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Add sqlite3.dll from windows/flutter/runner folder
+Source: "windows\sqlite3.dll"; DestDir: "{app}"; Flags: ignoreversion
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a &desktop icon"
 
 [Icons]
-; CRITICAL: Use full path and correct icon
-        Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\{#MyAppIcon}"
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: startmenuicon; IconFilename: "{app}\{#MyAppIcon}"
-Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; WorkingDir: "{app}"
 
 [Run]
-; Install VC++ first
-        Filename: "{app}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; WorkingDir: "{app}"; Flags: waituntilterminated runhidden; StatusMsg: "Installing required components..."
+; Install VC++ Redistributable if needed
+        Filename: "https://aka.ms/vs/17/release/vc_redist.x64.exe"; Parameters: "/quiet /norestart"; Flags: shellexec waituntilterminated; StatusMsg: "Installing Visual C++ Runtime..."; Check: VCRedistNeedsInstall
 
-; Launch app — THIS IS THE FIX
-Filename: "{app}\{#MyAppExeName}"; \
-    Description: "Launch {#MyAppName}"; \
-    Flags: nowait postinstall skipifsilent shellexec runascurrentuser; \
-    WorkingDir: "{app}"
+; Launch app
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"
 
 [Code]
-function InitializeSetup(): Boolean;
+function VCRedistNeedsInstall: Boolean;
+var
+        Version: String;
 begin
-        Result := True;
+Result := not RegQueryStringValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64', 'Version', Version);
 end;

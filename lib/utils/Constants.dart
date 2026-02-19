@@ -1,5 +1,5 @@
 class Constants {
-  static const String baseUrl = "http://37.27.228.21/safariparktest/public/api/";
+  static const String baseUrl = "http://37.27.228.21/lahorefort/public/api/";
 
 
   static const String login = "login";

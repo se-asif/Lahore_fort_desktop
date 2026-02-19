@@ -48,10 +48,8 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
 
       await SharedPrefHelper.getUser();
       if (await HelperFunction.hasInternetConnection()) {
-        // If internet is available, fetch from API
         ticketsProvider.getCategories(context);
       } else {
-        // If no internet, load from SharedPreferences
         List<TicketCategory> cachedCategories = await SharedPrefHelper.getCategoriesList();
         if (cachedCategories.isNotEmpty) {
           ticketsProvider.setCategoriesFromCache(cachedCategories);
@@ -67,164 +65,161 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: Stack(
-          children: [
-            // Background Image
-            Positioned.fill(
-              child: Image.asset(
-                'assets/images/lhore_fort.png',
-                // Replace with your background image
-                fit: BoxFit.cover,
-              ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/lhore_fort.png',
+              fit: BoxFit.cover,
             ),
+          ),
 
 
 
-            Positioned(
-              top: 6, // Adjust this to fine-tune positioning
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  //padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: ShaderMask(
-                    shaderCallback: (bounds) => LinearGradient(
-                      colors: [Color(0xFFFFA726), Color(0xFFFFD700)], // Golden effect
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomRight,
-                    ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
-                    child: Text(
-                      Constants.lahoreZoo, //"Lahore Safari"
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontFamily: 'MyFont',
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white, // Ensures ShaderMask works
-                      ),
+          Positioned(
+            top: 6,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                child: ShaderMask(
+                  shaderCallback: (bounds) => LinearGradient(
+                    colors: [Color(0xFFFFA726), Color(0xFFFFD700)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomRight,
+                  ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+                  child: Text(
+                    Constants.lahoreZoo,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontFamily: 'MyFont',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
               ),
             ),
+          ),
 
-            Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 60.h),
-                child: Center(
-                  child: Container(
-                    width: 250.w,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 60.h),
+              child: Center(
+                child: Container(
+                  width: 250.w,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          tableHeader("TYPE"),
+                          tableHeader("PRICE"),
+                          tableHeader("PERSONS"),
+                          tableHeader("AMOUNT"),
+                        ],
+                      ),
+                      const Divider(),
+                      Consumer<TicketsProvider>(
+                        builder: (context, ticketsProvider, child) {
+                          if (ticketsProvider.isLoading) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
 
+                          if (ticketsProvider.ticketCategoriesResponse == null ||
+                              ticketsProvider.ticketCategoriesResponse!.catagories.isEmpty) {
+                            return const Center(child: Text("No data available"));
+                          }
 
-                         //SizedBox(height: 10.h),
+                          final tickets = ticketsProvider.ticketCategoriesResponse!.catagories;
 
-                        // Table Header
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            tableHeader("TYPE"),
-                            tableHeader("PRICE"),
-                            tableHeader("PERSONS"),
-                            tableHeader("AMOUNT"),
-                          ],
-                        ),
-                        const Divider(),
-                        Consumer<TicketsProvider>(
+                          return Expanded(
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: tickets.length,
+                              itemBuilder: (context, index) {
+                                return ticketRow(tickets[index], ticketsProvider);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(),
+                      Consumer<TicketsProvider>(
                           builder: (context, ticketsProvider, child) {
-                            if (ticketsProvider.isLoading) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-
-                            if (ticketsProvider.ticketCategoriesResponse == null ||
-                                ticketsProvider.ticketCategoriesResponse!.catagories.isEmpty) {
-                              return const Center(child: Text("No data available"));
-                            }
-
-                            final tickets = ticketsProvider.ticketCategoriesResponse!.catagories;
-
-                            return Expanded( // Wrap ListView in Expanded
-                              child: ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: tickets.length,
-                                itemBuilder: (context, index) {
-                                  return ticketRow(tickets[index], ticketsProvider);
-                                },
-                              ),
-                            );
-                          },
-                        ),
-
-                        const Divider(),
-
-                        // Total Section
-                        Consumer<TicketsProvider>(
-                              builder: (context, ticketsProvider, child) {
-                                 return totalSection(ticketsProvider);
-                              }),
-
-                        SizedBox(height: 8.h),
-
-                        // Buttons
-                        Consumer<TicketsProvider>(
-                          builder: (context, provider, child) {
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                    child: paymentButton(
-                                        "Reset", Colors.red, () {
-                                          print("clear all called");
-                                          provider.clearAllData();
-                                          //
-                                    })),
-                                SizedBox(width: 10),
-                                // Adds spacing between buttons
-                                Expanded(
+                            return totalSection(ticketsProvider);
+                          }),
+                      SizedBox(height: 8.h),
+                      Consumer<TicketsProvider>(
+                        builder: (context, provider, child) {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                  child: paymentButton(
+                                      "Reset", Colors.red, () {
+                                    print("clear all called");
+                                    provider.clearAllData();
+                                    //
+                                  })),
+                              SizedBox(width: 10),
+                              Expanded(
                                   flex: 2,
-                                  child:
-                                      paymentButton("Cash", Colors.green, () {
-                                    provider.dataAddToDB(context);
-                                    ParkingReceiptDialog.show(
-                                        context, provider.visitingDataList);
+                                  child: paymentButton("Cash", Colors.green, () async {
+                                    await provider.dataAddToDB(context);
+                                    if (provider.visitingSummaryDataList != null &&
+                                        provider.visitingSummaryDataList!.isNotEmpty) {
+                                      ParkingReceiptDialog.show(context, provider.visitingSummaryDataList);
+                                    } else {
+                                      ToastUtils.showErrorToast(context, "No tickets to print");
+                                    }
                                   })),
                               Expanded(
                                   flex: 1,
                                   child:
-                                      paymentButton("Print Bill", Colors.blueAccent, () {
+                                  paymentButton("Print Bill", Colors.blueAccent, () {
                                     provider.printSummaryList(context);
 
                                   })),
                             ],
-                            );
-                          },
-                        )
-                      ],
-                    ),
+                          );
+                        },
+                      ),
+                      SizedBox(height: 10.h),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 30,right: 40),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("IP: 192.168.1.112"),
+                            Text("VERSION : 1.0.7")
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-            //MySideMenu()
-          ],
-        ),
+          ),
+          //MySideMenu()
+        ],
+      ),
     );
   }
-
-  // Header Text Widget
   Widget tableHeader(String text) {
     return Expanded(
       child: Text(
@@ -238,8 +233,6 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
       ),
     );
   }
-
-  // Single Ticket Row
   Widget ticketRow(TicketCategory category, TicketsProvider provider) {
     int personCount = provider.categoryPersons[category.id] ?? 0;
     return Row(
@@ -251,7 +244,6 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Decrease Button
               IconButton(
                 onPressed: () {
                   provider.decreasePersonCount(category.id);
@@ -269,7 +261,7 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
                 ),
                 child: FittedBox(
                   child: Text(
-                   personCount.toString(),
+                    personCount.toString(),
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -290,11 +282,11 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
         ),
         Expanded(
           child: Text(
-          "Rs. ${personCount * category.routineCharges!}",
+            "Rs. ${personCount * category.routineCharges!}",
             style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.orange,
-              fontSize: 20
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+                fontSize: 20
             ),
             textAlign: TextAlign.center,
           ),
@@ -302,11 +294,7 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
       ],
     );
   }
-
-  // Total Section
   Widget totalSection(TicketsProvider provider) {
-
-
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Container(
@@ -315,30 +303,27 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
           color: Color(0xffF5F5DC),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFF9A651D), // Purple color
-            width: 1, // Border thickness
+            color: const Color(0xFF9A651D),
+            width: 1,
           ),
         ),
         child: Row(
-
           children: [
             Text("Total:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Spacer(flex: 5,),
+            Spacer(flex: 5,),
 
-                      Text("${provider.totalPersons}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("${provider.totalPersons}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             Spacer(flex: 2,),
             Text(
-                        "Rs.${provider.totalCost}",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
-                      ),
+              "Rs.${provider.totalCost}",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
+            ),
             SizedBox(width: 16.w,)
           ],
         ),
       ),
     );
   }
-
-  // Payment Button Widget
   Widget paymentButton(String text, Color color, VoidCallback onPress) {
     return SizedBox(
       width: double.infinity,
