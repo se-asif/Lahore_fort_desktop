@@ -221,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                              children: [
                                Text("IP: 192.168.1.112"),
-                               Text("VERSION : 1.0.7")
+                               Text("VERSION : 1.0.8")
                              ],
                            ),
                          )

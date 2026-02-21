@@ -179,10 +179,13 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
                               Expanded(
                                   flex: 2,
                                   child: paymentButton("Cash", Colors.green, () async {
-                                    await provider.dataAddToDB(context);
-                                    if (provider.visitingSummaryDataList != null &&
+                                    bool success = await provider.dataAddToDB(context);
+                                    if (success && provider.visitingSummaryDataList != null &&
                                         provider.visitingSummaryDataList!.isNotEmpty) {
-                                      ParkingReceiptDialog.show(context, provider.visitingSummaryDataList);
+                                      await ParkingReceiptDialog.show(context, provider.visitingSummaryDataList);
+                                      provider.clearState();
+                                    } else if (!success) {
+                                      ToastUtils.showErrorToast(context, "Please select at least one ticket");
                                     } else {
                                       ToastUtils.showErrorToast(context, "No tickets to print");
                                     }
@@ -205,7 +208,7 @@ class _ZooTicketScreenState extends State<ZooTicketScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text("IP: 192.168.1.112"),
-                            Text("VERSION : 1.0.7")
+                            Text("VERSION : 1.0.8")
                           ],
                         ),
                       ),

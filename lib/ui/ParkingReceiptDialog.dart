@@ -22,7 +22,7 @@ class ParkingReceiptDialog {
 
   static bool _isPrinting =false;
 
-  static void show(BuildContext context, List<VisitingDataList>? visitorDataList) async {
+  static Future<void> show(BuildContext context, List<VisitingDataList>? visitorDataList) async {
     if (visitorDataList == null || visitorDataList.isEmpty) return;
 
     print('🎫 Starting ticket generation for ${visitorDataList.length} visitor data entries');

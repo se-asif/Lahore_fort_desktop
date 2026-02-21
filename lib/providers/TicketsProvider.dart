@@ -204,35 +204,42 @@ class TicketsProvider with ChangeNotifier {
     print(_visitingDataList);
   }
 
-  Future<void> dataAddToDB(BuildContext context) async {
+  Future<bool> dataAddToDB(BuildContext context) async {
     //await databaseHelper?.resetDatabase();
-   await addTicketsDataToList();
+    await addTicketsDataToList();
     if (categoryPersons.isNotEmpty) {
-
-      if (visitingDataList != null && visitingDataList!.isNotEmpty && await HelperFunction.hasInternetConnection()) {
-        updateIsUploaded(1);
-        _visitingSummaryDataList = visitingDataList;
+      if (visitingDataList != null && visitingDataList!.isNotEmpty) {
+        _visitingSummaryDataList = List.from(visitingDataList!);
         print('summary list is $visitingSummaryDataList');
-        for (var data in visitingDataList!) {
-          postVisitingData(context, data);
-          await databaseHelper?.insertVisitingData(data);
-        }
 
-        clearAllData();
-      } else {
-        updateIsUploaded(0);
-        for (var data in visitingDataList!) {
-          await databaseHelper
-              ?.insertVisitingData(data); // Pass object directly
+        if (await HelperFunction.hasInternetConnection()) {
+          updateIsUploaded(1);
+          for (var data in visitingDataList!) {
+            postVisitingData(context, data);
+            await databaseHelper?.insertVisitingData(data);
+          }
+        } else {
+          updateIsUploaded(0);
+          for (var data in visitingDataList!) {
+            await databaseHelper?.insertVisitingData(data);
+          }
+          print("Data saved successfully in SQLite!");
         }
-        print("Data saved successfully in SQLite!");
-        clearAllData();
+        return true;
       }
     } else {
-      clearAllData();
       print("No data available to save.");
-      //ToastUtils.showErrorToast(context, "Please select any Service");
+      return false;
     }
+    return false;
+  }
+
+  void clearState() {
+    _categoryPersons.clear();
+    _categoryTimestamps.clear();
+    _visitingDataList = null;
+    _visitingSummaryDataList = null;
+    notifyListeners();
   }
 
   // Increase person count

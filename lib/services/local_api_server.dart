@@ -8,7 +8,7 @@ import '../db_helper/DataBaseHelper.dart';
 class LocalApiServer {
   static HttpServer? _server;
   static const int port = 8088;
-  static const String desiredStaticIP = "192.168.100.177";
+  static const String desiredStaticIP = "192.168.1.112";
   static Future<String?> _getCurrentSystemIP() async {
     try {
       final interfaces = await NetworkInterface.list();
